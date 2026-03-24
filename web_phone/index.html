@@ -3,16 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>iCall - Conexión Forzada</title>
+    <title>LB-Link Video</title>
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
-        body { background: #000; color: #fff; font-family: -apple-system, sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; align-items: center; justify-content: center; }
-        #remote-video { width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; background: #111; }
-        #local-video { position: absolute; top: 20px; right: 20px; width: 80px; height: 120px; border-radius: 10px; border: 1px solid #444; z-index: 10; object-fit: cover; }
-        .setup-ui { z-index: 30; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 20px; text-align: center; backdrop-filter: blur(10px); border: 1px solid #333; }
-        .btn { display: block; width: 220px; padding: 15px; margin: 10px; border-radius: 30px; border: none; font-size: 16px; font-weight: bold; cursor: pointer; color: white; }
-        .btn-iphone { background: #007AFF; }
-        .btn-juego { background: #34C759; }
+        body { background: #000; color: #fff; font-family: -apple-system, sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        #remote-video { width: 100%; height: 100%; object-fit: cover; position: absolute; }
+        #local-video { position: absolute; top: 10px; right: 10px; width: 70px; height: 110px; border-radius: 8px; border: 1px solid #555; z-index: 10; object-fit: cover; }
+        .phone-ui { z-index: 20; position: absolute; bottom: 30px; width: 100%; text-align: center; padding: 20px; box-sizing: border-box; }
+        input { width: 80%; padding: 15px; border-radius: 10px; border: none; background: rgba(255,255,255,0.2); color: #fff; text-align: center; font-size: 20px; margin-bottom: 10px; backdrop-filter: blur(5px); }
+        .controls { display: flex; justify-content: center; gap: 10px; }
+        button { padding: 15px 25px; border-radius: 50px; border: none; font-weight: bold; cursor: pointer; font-size: 16px; }
+        .call-btn { background: #34C759; color: white; width: 60%; }
+        .hangup-btn { background: #FF3B30; color: white; width: 60%; display: none; }
         #status { font-size: 12px; color: #888; margin-top: 10px; }
     </style>
 </head>
@@ -20,60 +22,72 @@
     <video id="local-video" autoplay muted playsinline></video>
     <video id="remote-video" autoplay playsinline></video>
 
-    <div class="setup-ui" id="setup">
-        <h2>Selecciona Dispositivo</h2>
-        <button class="btn btn-iphone" onclick="iniciar('iphone')">ESTOY EN MI IPHONE</button>
-        <button class="btn btn-juego" onclick="iniciar('juego')">ESTOY EN EL JUEGO</button>
-        <div id="status">Esperando selección...</div>
+    <div class="phone-ui">
+        <input type="text" id="phone-number" placeholder="Número de teléfono">
+        <div class="controls">
+            <button id="btn-call" class="call-btn" onclick="iniciarLlamada()">LLAMAR</button>
+            <button id="btn-hangup" class="hangup-btn" onclick="colgarLlamada()">COLGAR</button>
+        </div>
+        <div id="status">Listo para conectar</div>
     </div>
 
     <script>
-        const ROOM_NAME = 'SALA_YIXA_UNICA'; // Cambia esto si quieres
-        let peer;
-        let localStream;
+        let peer, localStream, currentCall;
+        const statusText = document.getElementById('status');
+        const numInput = document.getElementById('phone-number');
 
-        // Intentar cámara
+        // 1. Obtener medios
         navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
             localStream = stream;
             document.getElementById('local-video').srcObject = stream;
-        }).catch(() => console.log("Cámara no disponible"));
+        }).catch(() => statusText.innerText = "Solo modo escucha");
 
-        function iniciar(rol) {
-            const myId = rol === 'iphone' ? 'iphone_' + ROOM_NAME : 'juego_' + ROOM_NAME;
-            const targetId = rol === 'iphone' ? 'juego_' + ROOM_NAME : 'iphone_' + ROOM_NAME;
+        // 2. Detectar si es el Juego o Web
+        // Si estamos en el juego, LB-Phone nos pasará el número por la URL o vía PostMessage
+        const urlParams = new URLSearchParams(window.location.search);
+        let miNumero = urlParams.get('number') || "WEB_" + Math.floor(Math.random() * 9000);
 
-            peer = new Peer(myId, {
-                host: '0.peerjs.com',
-                port: 443,
-                secure: true
+        peer = new Peer(miNumero, { host: '0.peerjs.com', port: 443, secure: true });
+
+        peer.on('open', id => {
+            statusText.innerText = "Tu ID/Número: " + id;
+            if(!id.startsWith("WEB_")) numInput.value = id; 
+        });
+
+        // 3. Recibir llamada
+        peer.on('call', call => {
+            currentCall = call;
+            call.answer(localStream);
+            actualizarUI(true);
+            call.on('stream', st => { document.getElementById('remote-video').srcObject = st; });
+            call.on('close', () => colgarLlamada());
+        });
+
+        function iniciarLlamada() {
+            const destino = numInput.value;
+            if(!destino) return;
+            
+            statusText.innerText = "Llamando a " + destino + "...";
+            currentCall = peer.call(destino, localStream);
+            actualizarUI(true);
+
+            currentCall.on('stream', st => {
+                document.getElementById('remote-video').srcObject = st;
+                statusText.innerText = "En línea";
             });
-
-            peer.on('open', id => {
-                document.getElementById('status').innerText = "Conectado como: " + rol;
-                if(rol === 'iphone') {
-                    document.getElementById('status').innerText = "Llamando al juego...";
-                    setTimeout(() => {
-                        const call = peer.call(targetId, localStream);
-                        vincularStream(call);
-                    }, 2000);
-                }
-            });
-
-            peer.on('call', call => {
-                call.answer(localStream);
-                vincularStream(call);
-            });
-
-            // Ocultar menú al iniciar
-            document.getElementById('setup').style.opacity = "0.2"; 
-            // Si quieres que desaparezca del todo después de conectar, usa display: none
         }
 
-        function vincularStream(call) {
-            call.on('stream', st => {
-                document.getElementById('remote-video').srcObject = st;
-                document.getElementById('setup').style.display = 'none';
-            });
+        function colgarLlamada() {
+            if(currentCall) currentCall.close();
+            document.getElementById('remote-video').srcObject = null;
+            actualizarUI(false);
+            statusText.innerText = "Llamada finalizada";
+        }
+
+        function actualizarUI(enLlamada) {
+            document.getElementById('btn-call').style.display = enLlamada ? 'none' : 'inline-block';
+            document.getElementById('btn-hangup').style.display = enLlamada ? 'inline-block' : 'none';
+            numInput.style.display = enLlamada ? 'none' : 'inline-block';
         }
     </script>
 </body>
