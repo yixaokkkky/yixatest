@@ -3,70 +3,77 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>iCall - Conexión Directa</title>
+    <title>iCall - Conexión Forzada</title>
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
-        body { background: #000; color: #fff; font-family: -apple-system, sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        #remote-video { width: 100%; height: 100%; object-fit: cover; position: absolute; }
+        body { background: #000; color: #fff; font-family: -apple-system, sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; align-items: center; justify-content: center; }
+        #remote-video { width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; background: #111; }
         #local-video { position: absolute; top: 20px; right: 20px; width: 80px; height: 120px; border-radius: 10px; border: 1px solid #444; z-index: 10; object-fit: cover; }
-        .ui { position: absolute; bottom: 40px; width: 100%; text-align: center; z-index: 20; }
-        .btn { background: #34C759; color: white; border: none; padding: 15px 30px; border-radius: 30px; font-size: 18px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.5); width: 80%; }
-        .btn.call { background: #007AFF; }
-        .info { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 10px; }
-        .status-dot { width: 10px; height: 10px; background: #ff3b30; border-radius: 50%; display: inline-block; margin-right: 5px; }
-        .online { background: #34c759; }
+        .setup-ui { z-index: 30; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 20px; text-align: center; backdrop-filter: blur(10px); border: 1px solid #333; }
+        .btn { display: block; width: 220px; padding: 15px; margin: 10px; border-radius: 30px; border: none; font-size: 16px; font-weight: bold; cursor: pointer; color: white; }
+        .btn-iphone { background: #007AFF; }
+        .btn-juego { background: #34C759; }
+        #status { font-size: 12px; color: #888; margin-top: 10px; }
     </style>
 </head>
 <body>
     <video id="local-video" autoplay muted playsinline></video>
     <video id="remote-video" autoplay playsinline></video>
 
-    <div class="ui">
-        <button id="main-btn" class="btn" onclick="iniciarAccion()">CONECTAR AHORA</button>
-        <div class="info" id="status-text"><span class="status-dot" id="dot"></span> Esperando...</div>
+    <div class="setup-ui" id="setup">
+        <h2>Selecciona Dispositivo</h2>
+        <button class="btn btn-iphone" onclick="iniciar('iphone')">ESTOY EN MI IPHONE</button>
+        <button class="btn btn-juego" onclick="iniciar('juego')">ESTOY EN EL JUEGO</button>
+        <div id="status">Esperando selección...</div>
     </div>
 
     <script>
-        // --- CONFIGURACIÓN DE SALA ---
-        // Cambia 'SALA_PRIVADA_YIXA' por algo único para que nadie más se meta
-        const ROOM_NAME = 'SALA_PRIVADA_YIXA'; 
-        
-        // El Juego se identificará como 'juego' y el iPhone como 'iphone'
-        const isIPhone = !navigator.userAgent.includes("Electron"); // Detección simple
-        const myId = isIPhone ? 'iphone_' + ROOM_NAME : 'juego_' + ROOM_NAME;
-        const targetId = isIPhone ? 'juego_' + ROOM_NAME : 'iphone_' + ROOM_NAME;
-
-        const peer = new Peer(myId); 
+        const ROOM_NAME = 'SALA_YIXA_UNICA'; // Cambia esto si quieres
+        let peer;
         let localStream;
 
+        // Intentar cámara
         navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
             localStream = stream;
             document.getElementById('local-video').srcObject = stream;
-        }).catch(() => { console.log("Modo Receptor Activo"); });
+        }).catch(() => console.log("Cámara no disponible"));
 
-        peer.on('open', () => {
-            document.getElementById('dot').classList.add('online');
-            document.getElementById('status-text').innerText = isIPhone ? "iPhone Listo" : "Juego Listo";
-            document.getElementById('main-btn').innerText = isIPhone ? "LLAMAR AL JUEGO" : "ESPERANDO LLAMADA...";
-        });
+        function iniciar(rol) {
+            const myId = rol === 'iphone' ? 'iphone_' + ROOM_NAME : 'juego_' + ROOM_NAME;
+            const targetId = rol === 'iphone' ? 'juego_' + ROOM_NAME : 'iphone_' + ROOM_NAME;
 
-        // Recibir llamada automáticamente
-        peer.on('call', call => {
-            call.answer(localStream);
-            call.on('stream', st => { 
-                document.getElementById('remote-video').srcObject = st;
-                document.getElementById('main-btn').style.display = 'none';
+            peer = new Peer(myId, {
+                host: '0.peerjs.com',
+                port: 443,
+                secure: true
             });
-        });
 
-        function iniciarAccion() {
-            if(isIPhone) {
-                const call = peer.call(targetId, localStream);
-                call.on('stream', st => { 
-                    document.getElementById('remote-video').srcObject = st;
-                    document.getElementById('main-btn').style.display = 'none';
-                });
-            }
+            peer.on('open', id => {
+                document.getElementById('status').innerText = "Conectado como: " + rol;
+                if(rol === 'iphone') {
+                    document.getElementById('status').innerText = "Llamando al juego...";
+                    setTimeout(() => {
+                        const call = peer.call(targetId, localStream);
+                        vincularStream(call);
+                    }, 2000);
+                }
+            });
+
+            peer.on('call', call => {
+                call.answer(localStream);
+                vincularStream(call);
+            });
+
+            // Ocultar menú al iniciar
+            document.getElementById('setup').style.opacity = "0.2"; 
+            // Si quieres que desaparezca del todo después de conectar, usa display: none
+        }
+
+        function vincularStream(call) {
+            call.on('stream', st => {
+                document.getElementById('remote-video').srcObject = st;
+                document.getElementById('setup').style.display = 'none';
+            });
         }
     </script>
 </body>
