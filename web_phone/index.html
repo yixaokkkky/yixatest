@@ -187,14 +187,51 @@
       document.getElementById(id).classList.add('active');
     }
 
-    async function init() {
-      const res = await fetchNui('getMyNumber', {});
-      myNumber = res.number;
-      if (myNumber) {
-        document.getElementById('my-number-label').textContent = myNumber;
-        initPeer(myNumber);
-      } else { setTimeout(init, 1500); }
+        async function init() {
+      let numberToUse = null;
+
+      // 1. Si estamos en el juego (FiveM), intentamos sacar el oficial
+      if (isFiveM()) {
+        try {
+          const res = await fetchNui('getMyNumber', {});
+          if (res.number && res.number !== "") {
+            numberToUse = res.number;
+          }
+        } catch (e) {
+          console.warn("No se pudo obtener el número de FiveM, usando aleatorio.");
+        }
+      }
+
+      // 2. Si NO estamos en FiveM o el juego no nos dio número aún
+      if (!numberToUse) {
+        // Buscamos en la URL (?number=123)
+        const urlParams = new URLSearchParams(window.location.search);
+        let urlNum = urlParams.get('number');
+
+        if (urlNum) {
+          numberToUse = urlNum;
+        } else {
+          // 3. SI NO HAY NADA: Generamos uno aleatorio único para esta sesión
+          // Usamos sessionStorage para que si refrescas la página no te cambie el número
+          let stored = sessionStorage.getItem('my_random_id');
+          if (stored) {
+            numberToUse = stored;
+          } else {
+            // Generar 6 dígitos aleatorios
+            numberToUse = Math.floor(100000 + Math.random() * 900000).toString();
+            sessionStorage.setItem('my_random_id', numberToUse);
+          }
+        }
+      }
+
+      // Guardar y arrancar
+      myNumber = numberToUse;
+      document.getElementById('my-number-label').textContent = myNumber;
+      document.getElementById('peer-status').textContent = 'Conectando...';
+      
+      initPeer(myNumber);
     }
+
 
     window.addEventListener('message', (e) => {
       if (e.data.action === 'callStarted') showCallScreen(e.data.number, e.data.name || e.data.number);
