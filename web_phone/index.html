@@ -42,7 +42,7 @@
 
     .screen.active { display: flex; pointer-events: all; }
 
-    /* ── HOME ── */
+    /* ── HOME SCREEN ── */
     #home-screen { padding: 24px 20px 32px; background: var(--bg); }
     .app-header { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
     .app-logo {
@@ -116,6 +116,7 @@
 </head>
 <body>
 
+  <!-- ══════════════ HOME SCREEN ══════════════ -->
   <div id="home-screen" class="screen active">
     <div class="app-header">
       <div class="app-logo">📹</div>
@@ -144,6 +145,7 @@
     <div class="status-text"><span class="status-dot"></span> <span id="peer-status">Conectando...</span></div>
   </div>
 
+  <!-- ══════════════ INCOMING SCREEN ══════════════ -->
   <div id="incoming-screen" class="screen" style="align-items:center; justify-content:center; background:linear-gradient(to bottom, #1a0d2e, #0a0a0f);">
     <div style="font-size:12px; text-transform:uppercase; letter-spacing:2px; margin-bottom:10px;">Llamada de</div>
     <div id="incoming-number-label" style="font-size:32px; font-weight:700; margin-bottom:40px;">---</div>
@@ -153,6 +155,7 @@
     </div>
   </div>
 
+  <!-- ══════════════ CALL SCREEN ══════════════ -->
   <div id="call-screen" class="screen">
     <video id="remote-video" autoplay playsinline></video>
     <div class="no-video-placeholder" id="no-video-placeholder">📡 <p>Esperando video...</p></div>
@@ -187,57 +190,43 @@
       document.getElementById(id).classList.add('active');
     }
 
+    // ═══════════════════════════════════════════════
+    // INIT - Corrección del error de duplicación
+    // ═══════════════════════════════════════════════
     async function init() {
       let numberToUse = null;
 
-      // 1. Si estamos en el juego (FiveM), intentamos sacar el oficial
       if (isFiveM()) {
         try {
           const res = await fetchNui('getMyNumber', {});
-          if (res.number && res.number !== "") {
-            numberToUse = res.number;
-          }
-        } catch (e) {
-          console.warn("No se pudo obtener el número de FiveM, usando aleatorio.");
-        }
+          if (res.number && res.number !== "") { numberToUse = res.number; }
+        } catch (e) { console.warn("Error FiveM, usando aleatorio."); }
       }
 
-      // 2. Si NO estamos en FiveM o el juego no nos dio número aún
       if (!numberToUse) {
-        // Buscamos en la URL (?number=123)
         const urlParams = new URLSearchParams(window.location.search);
         let urlNum = urlParams.get('number');
-
         if (urlNum) {
           numberToUse = urlNum;
         } else {
-          // 3. SI NO HAY NADA: Generamos uno aleatorio único para esta sesión
-          // Usamos sessionStorage para que si refrescas la página no te cambie el número
           let stored = sessionStorage.getItem('my_random_id');
-          if (stored) {
-            numberToUse = stored;
-          } else {
-            // Generar 6 dígitos aleatorios
+          if (stored) { numberToUse = stored; } 
+          else {
             numberToUse = Math.floor(100000 + Math.random() * 900000).toString();
             sessionStorage.setItem('my_random_id', numberToUse);
           }
         }
       }
 
-      // Guardar y arrancar
       myNumber = numberToUse;
-      document.getElementById('my-number-label').textContent = myNumber;
-      document.getElementById('peer-status').textContent = 'Conectando...';
+      const label = document.getElementById('my-number-label');
+      if (label) label.textContent = myNumber;
+      
+      const st = document.getElementById('peer-status');
+      if (st) st.textContent = 'Listo · ' + myNumber;
       
       initPeer(myNumber);
     }
-
-
-      document.getElementById('my-number-label').textContent = myNumber;
-      initPeer(myNumber);
-    }
-
-
 
     window.addEventListener('message', (e) => {
       if (e.data.action === 'callStarted') showCallScreen(e.data.number, e.data.name || e.data.number);
@@ -245,12 +234,17 @@
     });
 
     function initPeer(number) {
+      if (peer) { try { peer.destroy(); } catch(e){} }
       peer = new Peer('lbvc_' + number, { host: '0.peerjs.com', port: 443, secure: true });
       peer.on('open', () => document.getElementById('peer-status').textContent = 'Listo · ' + number);
       peer.on('call', (call) => {
         incomingCallRef = call;
         document.getElementById('incoming-number-label').textContent = call.peer.replace('lbvc_', '');
         showScreen('incoming-screen');
+      });
+      peer.on('error', (err) => {
+        document.getElementById('peer-status').textContent = 'Error: ' + err.type;
+        if (err.type === 'network' || err.type === 'server-error') setTimeout(() => initPeer(number), 3000);
       });
     }
 
@@ -284,26 +278,44 @@
     }
 
     async function startGameCamera() {
+      isSelfie = true; 
       await fetchNui('startGameCamera', { selfie: isSelfie });
-      const canvas = document.createElement('canvas');
+
+      const canvas = document.createElement('canvas'); // Off-screen captura
       canvas.width = 360; canvas.height = 640;
       const ctx = canvas.getContext('2d');
+
       if (globalThis.components?.createGameRender) {
-        const gc = document.createElement('canvas');
-        gameRender = globalThis.components.createGameRender(gc);
-        let active = true;
-        window._stopGameFrameLoop = () => active = false;
-        async function loop() {
-          while(active && gameRender) {
-            const b = await gameRender.takePhoto();
-            if (b && active) { const img = await createImageBitmap(b); ctx.drawImage(img, 0,0,360,640); img.close(); }
-            await new Promise(r => setTimeout(r, 50));
+        try {
+          const gc = document.createElement('canvas');
+          gc.width = 360; gc.height = 640;
+          gameRender = globalThis.components.createGameRender(gc);
+          gameRender.resizeByAspect(9 / 16); // Centrado vertical
+          
+          let active = true;
+          window._stopGameFrameLoop = () => active = false;
+          async function loop() {
+            while(active && gameRender && !gameRender._destroyed) {
+              try {
+                const b = await gameRender.takePhoto();
+                if (b && active) { 
+                  const img = await createImageBitmap(b); 
+                  ctx.clearRect(0,0,360,640);
+                  ctx.drawImage(img, 0,0,360,640); 
+                  img.close(); 
+                }
+              } catch(e) {}
+              await new Promise(r => setTimeout(r, 60));
+            }
           }
-        }
-        loop();
+          loop();
+        } catch (e) { gameRender = null; }
       }
-      localStream = canvas.captureStream ? canvas.captureStream(20) : new MediaStream();
-      try { const a = await navigator.mediaDevices.getUserMedia({ audio: true }); a.getTracks().forEach(t => localStream.addTrack(t)); } catch(e) {}
+      localStream = canvas.captureStream ? canvas.captureStream(18) : new MediaStream();
+      try { 
+        const a = await navigator.mediaDevices.getUserMedia({ audio: true, video: false }); 
+        a.getTracks().forEach(t => localStream.addTrack(t)); 
+      } catch(e) {}
       document.getElementById('local-video-pip').srcObject = localStream;
     }
 
@@ -316,13 +328,21 @@
 
     function setupRemoteStreamHandlers(call) {
       call.on('stream', s => attachRemoteStream(s));
-      if (call.peerConnection) call.peerConnection.ontrack = e => e.streams[0] && attachRemoteStream(e.streams[0]);
+      call.on('close', () => cleanupCall());
+      call.on('error', () => cleanupCall());
+      if (call.peerConnection) {
+        call.peerConnection.ontrack = e => e.streams[0] && attachRemoteStream(e.streams[0]);
+        call.peerConnection.oniceconnectionstatechange = () => {
+          const s = call.peerConnection.iceConnectionState;
+          if (s === 'disconnected' || s === 'closed' || s === 'failed') cleanupCall();
+        };
+      }
     }
 
     function attachRemoteStream(s) {
       const v = document.getElementById('remote-video');
       if (v.srcObject !== s) v.srcObject = s;
-      v.play();
+      v.play().catch(()=>{});
       document.getElementById('no-video-placeholder').style.display = 'none';
     }
 
@@ -338,14 +358,20 @@
     }
 
     function hangUp() { if (currentCall) currentCall.close(); fetchNui('endCall'); cleanupCall(); }
+    
     function cleanupCall() {
       clearInterval(callTimerInterval);
       if (localStream) localStream.getTracks().forEach(t => t.stop());
       if (window._stopGameFrameLoop) window._stopGameFrameLoop();
       if (gameRender) gameRender.destroy();
       fetchNui('stopGameCamera');
+
       document.getElementById('remote-video').srcObject = null;
+      document.getElementById('local-video-pip').srcObject = null;
       document.getElementById('no-video-placeholder').style.display = 'flex';
+      isMuted = false;
+      inputNumber = '';
+      document.getElementById('number-input-display').textContent = '';
       showScreen('home-screen');
     }
 
