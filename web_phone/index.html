@@ -191,6 +191,7 @@
     let cameraMode = 'real';
     let gameRender = null;
     let incomingCallRef = null;
+    let activeCallId = 0;
 
     function isFiveM() { return window.location.hostname === 'cfx-nui'; }
 
@@ -299,7 +300,8 @@
       await prepareLocalStream();
 
       currentCall = peer.call('lbvc_' + target, localStream || new MediaStream());
-      setupRemoteStreamHandlers(currentCall);
+      activeCallId++;
+      setupRemoteStreamHandlers(currentCall, activeCallId);
     }
 
     // ═══════════════════════════════════════════════
@@ -312,7 +314,8 @@
 
       await prepareLocalStream();
       incomingCallRef.answer(localStream || new MediaStream());
-      setupRemoteStreamHandlers(incomingCallRef);
+      activeCallId++;
+      setupRemoteStreamHandlers(incomingCallRef, activeCallId);
       currentCall = incomingCallRef;
       incomingCallRef = null;
     }
@@ -402,30 +405,29 @@
     // ═══════════════════════════════════════════════
     // STREAM REMOTO + SINCRONIZACIÓN DE COLGADO
     // ═══════════════════════════════════════════════
-    function setupRemoteStreamHandlers(call) {
-      // Recibir video/audio del otro lado
-      call.on('stream', (s) => attachRemoteStream(s));
+    function setupRemoteStreamHandlers(call, myCallId) {
+      function safeCleanup() {
+        if (myCallId === activeCallId) cleanupCall();
+      }
 
-      // COLGADO SINCRONIZADO: si el otro cierra, nosotros también
-      call.on('close', () => {
-        console.log('[reaCall] La otra persona colgó');
-        cleanupCall();
+      call.on('stream', (s) => {
+        if (myCallId !== activeCallId) return;
+        attachRemoteStream(s);
       });
 
-      call.on('error', () => cleanupCall());
+      call.on('close', safeCleanup);
+      call.on('error', safeCleanup);
 
-      // Fallback directo en peerConnection
       if (call.peerConnection) {
         call.peerConnection.ontrack = (e) => {
+          if (myCallId !== activeCallId) return;
           if (e.streams && e.streams[0]) attachRemoteStream(e.streams[0]);
         };
 
-        // Detectar desconexión ICE
         call.peerConnection.oniceconnectionstatechange = () => {
           const state = call.peerConnection.iceConnectionState;
-          if (state === 'disconnected' || state === 'closed' || state === 'failed') {
-            console.log('[reaCall] ICE desconectado:', state);
-            cleanupCall();
+          if ((state === 'disconnected' || state === 'closed' || state === 'failed') && myCallId === activeCallId) {
+            safeCleanup();
           }
         };
       }
