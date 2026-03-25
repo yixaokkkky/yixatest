@@ -1,878 +1,316 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>VideoCall</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
-<style>
-  :root {
-    --bg: #0a0a0f;
-    --surface: #12121a;
-    --surface2: #1a1a26;
-    --border: rgba(255,255,255,0.07);
-    --accent: #6c63ff;
-    --accent2: #ff6584;
-    --green: #00e676;
-    --red: #ff1744;
-    --text: #f0f0ff;
-    --muted: #6b6b88;
-    --glass: rgba(18,18,26,0.85);
-  }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>reaCall Premium</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #12121a;
+      --surface2: #1a1a26;
+      --border: rgba(255, 255, 255, 0.07);
+      --accent: #6c63ff;
+      --accent2: #ff6584;
+      --green: #00e676;
+      --red: #ff1744;
+      --text: #f0f0ff;
+      --muted: #6b6b88;
+      --glass: rgba(18, 18, 26, 0.85);
+    }
 
-  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
-  body {
-    font-family: 'Outfit', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    height: 100vh;
-    overflow: hidden;
-    position: relative;
-  }
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+      position: relative;
+    }
 
-  /* ── SCREENS ── */
-  .screen {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.35s ease;
-  }
-  .screen.active {
-    opacity: 1;
-    pointer-events: all;
-  }
+    .screen {
+      position: absolute; inset: 0;
+      display: none;
+      flex-direction: column;
+      pointer-events: none;
+    }
 
-  /* ── HOME SCREEN ── */
-  #home-screen {
-    padding: 24px 20px 32px;
-    background: var(--bg);
-    gap: 0;
-  }
+    .screen.active { display: flex; pointer-events: all; }
 
-  .app-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 28px;
-  }
-  .app-logo {
-    width: 36px; height: 36px;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 18px;
-  }
-  .app-title {
-    font-size: 20px;
-    font-weight: 700;
-    letter-spacing: -0.5px;
-  }
-  .my-number-badge {
-    margin-left: auto;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 4px 12px;
-    font-size: 11px;
-    color: var(--muted);
-  }
-  .my-number-badge span {
-    color: var(--accent);
-    font-weight: 600;
-  }
+    /* ── HOME ── */
+    #home-screen { padding: 24px 20px 32px; background: var(--bg); }
+    .app-header { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
+    .app-logo {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px;
+    }
+    .app-title { font-size: 20px; font-weight: 700; }
+    .my-number-badge { margin-left: auto; background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 4px 12px; font-size: 11px; color: var(--muted); }
 
-  /* Dial pad */
-  .dial-label {
-    font-size: 11px;
-    font-weight: 500;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    margin-bottom: 10px;
-  }
+    .number-display {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 14px 18px;
+      font-size: 22px; font-weight: 300; letter-spacing: 3px; min-height: 56px; margin-bottom: 16px;
+      display: flex; align-items: center; position: relative; overflow: hidden;
+    }
 
-  .number-display {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 14px 18px;
-    font-size: 22px;
-    font-weight: 300;
-    letter-spacing: 3px;
-    color: var(--text);
-    min-height: 56px;
-    margin-bottom: 16px;
-    display: flex;
-    align-items: center;
-    position: relative;
-    overflow: hidden;
-  }
-  .number-display::after {
-    content: '';
-    position: absolute;
-    right: 0; top: 0; bottom: 0;
-    width: 40px;
-    background: linear-gradient(to left, var(--surface), transparent);
-  }
-  #number-input-display {
-    flex: 1;
-    overflow: hidden;
-    white-space: nowrap;
-  }
-  .cursor-blink {
-    display: inline-block;
-    width: 2px; height: 24px;
-    background: var(--accent);
-    margin-left: 2px;
-    vertical-align: middle;
-    animation: blink 1s step-end infinite;
-  }
-  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+    .dialpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+    .dial-key { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 8px; text-align: center; cursor: pointer; transition: all 0.15s; }
+    .dial-key:active { background: var(--surface2); transform: scale(0.95); }
 
-  .backspace-btn {
-    position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
-    z-index: 2;
-    background: none; border: none; cursor: pointer;
-    color: var(--muted); font-size: 20px; padding: 4px;
-    transition: color 0.2s;
-  }
-  .backspace-btn:active { color: var(--text); }
+    .call-btn {
+      width: 100%; padding: 16px; border-radius: 16px; border: none; cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), #9c59ff); color: #fff; font-weight: 600;
+      box-shadow: 0 8px 32px rgba(108, 99, 255, 0.35); display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
 
-  .dialpad {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-    margin-bottom: 20px;
-  }
-  .dial-key {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 14px 8px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.15s;
-    user-select: none;
-  }
-  .dial-key:active {
-    background: var(--surface2);
-    transform: scale(0.95);
-    border-color: var(--accent);
-  }
-  .dial-key .digit {
-    font-size: 22px;
-    font-weight: 500;
-    line-height: 1;
-  }
-  .dial-key .sub {
-    font-size: 8px;
-    color: var(--muted);
-    letter-spacing: 1px;
-    margin-top: 2px;
-  }
+    /* ── CALL SCREEN ── */
+    #call-screen { background: #000; overflow: hidden; width: 100%; height: 100vh; }
+    #remote-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; background: #000; }
 
-  .call-btn {
-    width: 100%;
-    padding: 16px;
-    border-radius: 16px;
-    border: none;
-    cursor: pointer;
-    font-family: 'Outfit', sans-serif;
-    font-size: 16px;
-    font-weight: 600;
-    letter-spacing: 0.3px;
-    background: linear-gradient(135deg, var(--accent), #9c59ff);
-    color: #fff;
-    box-shadow: 0 8px 32px rgba(108,99,255,0.35);
-    transition: all 0.2s;
-    display: flex; align-items: center; justify-content: center; gap: 8px;
-  }
-  .call-btn:active { transform: scale(0.97); box-shadow: 0 4px 16px rgba(108,99,255,0.25); }
+    .call-overlay {
+      position: absolute; inset: 0; z-index: 10; display: flex; flex-direction: column;
+      background: rgba(0, 0, 0, 0.2); backdrop-filter: blur(1px); pointer-events: none;
+    }
+    .call-overlay > * { pointer-events: all; }
 
-  /* ── INCOMING SCREEN ── */
-  #incoming-screen {
-    background: linear-gradient(160deg, #0f0f1a 0%, #1a0d2e 100%);
-    align-items: center;
-    justify-content: center;
-    gap: 0;
-  }
+    .call-overlay::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 160px; background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent); z-index: -1; }
+    .call-overlay::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 240px; background: linear-gradient(to top, rgba(0,0,0,0.9), transparent); z-index: -1; }
 
-  .incoming-ripple {
-    position: relative;
-    width: 100px; height: 100px;
-    margin-bottom: 30px;
-  }
-  .incoming-ripple .avatar-circle {
-    width: 100px; height: 100px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    display: flex; align-items: center; justify-content: center;
-    font-size: 40px;
-    position: relative; z-index: 2;
-  }
-  .ripple {
-    position: absolute; inset: -15px;
-    border-radius: 50%;
-    border: 2px solid rgba(108,99,255,0.4);
-    animation: ripple 2s ease-out infinite;
-  }
-  .ripple:nth-child(2) { inset: -30px; animation-delay: 0.5s; border-color: rgba(108,99,255,0.25); }
-  .ripple:nth-child(3) { inset: -45px; animation-delay: 1s; border-color: rgba(108,99,255,0.12); }
-  @keyframes ripple {
-    0% { transform: scale(0.9); opacity: 1; }
-    100% { transform: scale(1.1); opacity: 0; }
-  }
+    .call-top { padding: 30px 20px 0; display: flex; flex-direction: column; align-items: center; }
+    .call-name { font-size: 24px; font-weight: 700; text-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+    .call-timer { font-size: 14px; color: rgba(255,255,255,0.8); margin-top: 6px; background: rgba(0,0,0,0.3); padding: 2px 10px; border-radius: 12px; backdrop-filter: blur(4px); }
 
-  .incoming-label {
-    font-size: 12px; color: var(--muted); letter-spacing: 2px;
-    text-transform: uppercase; margin-bottom: 8px;
-  }
-  .incoming-number {
-    font-size: 28px; font-weight: 700; letter-spacing: -1px;
-    margin-bottom: 6px;
-  }
-  .incoming-sub {
-    font-size: 13px; color: var(--muted); margin-bottom: 60px;
-  }
+    #local-pip {
+      position: absolute; top: 100px; right: 20px; width: 90px; height: 140px; border-radius: 16px;
+      overflow: hidden; border: 1px solid rgba(255,255,255,0.2); z-index: 12; background: #111; box-shadow: 0 12px 32px rgba(0,0,0,0.8);
+    }
 
-  .incoming-actions {
-    display: flex; gap: 40px;
-  }
-  .action-btn {
-    display: flex; flex-direction: column; align-items: center; gap: 8px;
-    cursor: pointer;
-  }
-  .action-btn .circle {
-    width: 64px; height: 64px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 26px;
-    transition: transform 0.2s;
-  }
-  .action-btn:active .circle { transform: scale(0.92); }
-  .action-btn .label { font-size: 12px; color: var(--muted); }
-  .accept-btn .circle { background: var(--green); box-shadow: 0 8px 24px rgba(0,230,118,0.4); }
-  .decline-btn .circle { background: var(--red); box-shadow: 0 8px 24px rgba(255,23,68,0.4); }
+    .call-bottom { margin-top: auto; padding: 0 24px 50px; display: flex; flex-direction: column; gap: 24px; }
+    .call-controls { display: flex; justify-content: center; gap: 25px; }
+    .ctrl-btn .circle {
+      width: 56px; height: 56px; border-radius: 50%; background: rgba(255,255,255,0.1); backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; font-size: 24px; transition: all 0.25s;
+    }
+    .ctrl-btn.active .circle { background: #fff; color: #000; }
+    .ctrl-btn:active .circle { transform: scale(0.85); }
+    .ctrl-btn .label { font-size: 11px; color: rgba(255,255,255,0.7); margin-top: 8px; text-align: center; }
 
-  /* ── CALL SCREEN ── */
-  #call-screen {
-    background: #000;
-    overflow: hidden;
-  }
+    .hangup-btn {
+      width: 100%; padding: 18px; border-radius: 20px; border: none;
+      background: linear-gradient(135deg, #ff1744, #d50000); color: #fff; font-size: 17px; font-weight: 700;
+      box-shadow: 0 10px 30px rgba(255, 23, 68, 0.4); display: flex; align-items: center; justify-content: center; gap: 12px;
+    }
 
-  #remote-video {
-    position: absolute; inset: 0;
-    width: 100%; height: 100%;
-    object-fit: cover;
-    z-index: 1;
-  }
+    .status-text { font-size: 10px; color: var(--muted); display: flex; align-items: center; gap: 5px; margin-top: 10px; }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px var(--green); }
 
-  /* Game render canvas (GTA camera) */
-  #game-canvas {
-    position: absolute; inset: 0;
-    width: 100%; height: 100%;
-    object-fit: cover;
-    z-index: 2;
-    display: none;
-  }
-
-  .call-overlay {
-    position: absolute; inset: 0;
-    z-index: 10;
-    display: flex; flex-direction: column;
-    background: linear-gradient(to bottom,
-      rgba(0,0,0,0.5) 0%,
-      transparent 30%,
-      transparent 60%,
-      rgba(0,0,0,0.7) 100%
-    );
-  }
-
-  .call-top {
-    padding: 20px 20px 0;
-    display: flex; flex-direction: column; align-items: center;
-  }
-  .call-name {
-    font-size: 22px; font-weight: 700; letter-spacing: -0.5px;
-    text-shadow: 0 2px 8px rgba(0,0,0,0.6);
-  }
-  .call-timer {
-    font-size: 13px; color: rgba(255,255,255,0.7);
-    margin-top: 4px;
-    font-variant-numeric: tabular-nums;
-  }
-
-  #local-pip {
-    position: absolute;
-    top: 80px; right: 16px;
-    width: 80px; height: 120px;
-    border-radius: 14px;
-    overflow: hidden;
-    border: 2px solid rgba(255,255,255,0.2);
-    z-index: 11;
-    background: #111;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-  }
-  #local-pip video, #local-pip canvas {
-    width: 100%; height: 100%;
-    object-fit: cover;
-  }
-
-  .call-bottom {
-    margin-top: auto;
-    padding: 0 24px 40px;
-  }
-
-  .call-controls {
-    display: flex;
-    justify-content: center;
-    gap: 20px;
-    margin-bottom: 20px;
-  }
-  .ctrl-btn {
-    display: flex; flex-direction: column; align-items: center; gap: 6px;
-    cursor: pointer;
-  }
-  .ctrl-btn .circle {
-    width: 52px; height: 52px; border-radius: 50%;
-    background: rgba(255,255,255,0.12);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255,255,255,0.1);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 22px;
-    transition: all 0.2s;
-  }
-  .ctrl-btn.active .circle {
-    background: rgba(255,255,255,0.9);
-    color: #000;
-  }
-  .ctrl-btn:active .circle { transform: scale(0.92); }
-  .ctrl-btn .label { font-size: 10px; color: rgba(255,255,255,0.5); }
-
-  .hangup-btn {
-    width: 100%;
-    padding: 16px;
-    border-radius: 16px; border: none;
-    background: var(--red);
-    box-shadow: 0 8px 24px rgba(255,23,68,0.4);
-    color: #fff;
-    font-family: 'Outfit', sans-serif;
-    font-size: 16px; font-weight: 600;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center; gap: 8px;
-    transition: all 0.2s;
-  }
-  .hangup-btn:active { transform: scale(0.97); }
-
-  /* ── CAMERA MODE TOGGLE ── */
-  .cam-mode-bar {
-    display: flex; gap: 8px; margin-bottom: 12px;
-  }
-  .cam-mode-btn {
-    flex: 1; padding: 9px;
-    border-radius: 10px; border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--muted);
-    font-family: 'Outfit', sans-serif;
-    font-size: 12px; font-weight: 500;
-    cursor: pointer; transition: all 0.2s;
-    text-align: center;
-  }
-  .cam-mode-btn.active {
-    background: var(--surface2);
-    border-color: var(--accent);
-    color: var(--text);
-  }
-
-  /* ── STATUS BAR ── */
-  .status-dot {
-    display: inline-block;
-    width: 7px; height: 7px; border-radius: 50%;
-    background: var(--green);
-    box-shadow: 0 0 6px var(--green);
-    animation: pulse-dot 2s ease-in-out infinite;
-  }
-  @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.4} }
-  .status-text {
-    font-size: 10px; color: var(--muted);
-    display: flex; align-items: center; gap: 5px;
-    margin-top: 6px;
-  }
-
-  /* ── NO SIGNAL SCREEN ── */
-  .no-video-placeholder {
-    width: 100%; height: 100%;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    gap: 12px;
-    color: var(--muted);
-  }
-  .no-video-placeholder .icon { font-size: 48px; opacity: 0.4; }
-  .no-video-placeholder p { font-size: 13px; opacity: 0.6; }
-
-  /* Scrollable content */
-  .scroll-content {
-    flex: 1;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-  .scroll-content::-webkit-scrollbar { display: none; }
-</style>
+    #local-video-pip { width: 100%; height: 100%; object-fit: cover; }
+    .no-video-placeholder { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--muted); z-index: 0; }
+  </style>
 </head>
 <body>
 
-<!-- ══════════════ HOME SCREEN ══════════════ -->
-<div id="home-screen" class="screen active">
-  <div class="app-header">
-    <div class="app-logo">📹</div>
-    <div class="app-title">VideoCall</div>
-    <div class="my-number-badge">Mi número: <span id="my-number-label">---</span></div>
-  </div>
-
-  <div class="dial-label">Número a llamar</div>
-  <div class="number-display">
-    <div id="number-input-display"></div>
-    <span class="cursor-blink"></span>
-    <button class="backspace-btn" onclick="backspace()">⌫</button>
-  </div>
-
-  <div class="dialpad">
-    <div class="dial-key" onclick="pressKey('1')"><div class="digit">1</div><div class="sub"></div></div>
-    <div class="dial-key" onclick="pressKey('2')"><div class="digit">2</div><div class="sub">ABC</div></div>
-    <div class="dial-key" onclick="pressKey('3')"><div class="digit">3</div><div class="sub">DEF</div></div>
-    <div class="dial-key" onclick="pressKey('4')"><div class="digit">4</div><div class="sub">GHI</div></div>
-    <div class="dial-key" onclick="pressKey('5')"><div class="digit">5</div><div class="sub">JKL</div></div>
-    <div class="dial-key" onclick="pressKey('6')"><div class="digit">6</div><div class="sub">MNO</div></div>
-    <div class="dial-key" onclick="pressKey('7')"><div class="digit">7</div><div class="sub">PQRS</div></div>
-    <div class="dial-key" onclick="pressKey('8')"><div class="digit">8</div><div class="sub">TUV</div></div>
-    <div class="dial-key" onclick="pressKey('9')"><div class="digit">9</div><div class="sub">WXYZ</div></div>
-    <div class="dial-key" onclick="pressKey('*')"><div class="digit">*</div><div class="sub"></div></div>
-    <div class="dial-key" onclick="pressKey('0')"><div class="digit">0</div><div class="sub">+</div></div>
-    <div class="dial-key" onclick="pressKey('#')"><div class="digit">#</div><div class="sub"></div></div>
-  </div>
-
-  <button class="call-btn" onclick="startCall()">
-    📹 Iniciar Videollamada
-  </button>
-  <div class="status-text">
-    <span class="status-dot"></span>
-    <span id="peer-status">Conectando al servidor...</span>
-  </div>
-</div>
-
-<!-- ══════════════ INCOMING SCREEN ══════════════ -->
-<div id="incoming-screen" class="screen">
-  <div class="incoming-ripple">
-    <div class="ripple"></div>
-    <div class="ripple"></div>
-    <div class="ripple"></div>
-    <div class="avatar-circle">👤</div>
-  </div>
-  <div class="incoming-label">Videollamada entrante</div>
-  <div class="incoming-number" id="incoming-number-label">---</div>
-  <div class="incoming-sub">Toca para contestar</div>
-  <div class="incoming-actions">
-    <div class="action-btn decline-btn" onclick="declineCall()">
-      <div class="circle">📵</div>
-      <div class="label">Rechazar</div>
+  <div id="home-screen" class="screen active">
+    <div class="app-header">
+      <div class="app-logo">📹</div>
+      <div class="app-title">reaCall</div>
+      <div class="my-number-badge">Mi número: <span id="my-number-label">---</span></div>
     </div>
-    <div class="action-btn accept-btn" onclick="acceptCall()">
-      <div class="circle">📹</div>
-      <div class="label">Aceptar</div>
+    <div class="number-display">
+      <div id="number-input-display"></div>
+      <button style="position:absolute; right:15px; background:none; border:none; color:white; font-size:20px;" onclick="backspace()">⌫</button>
+    </div>
+    <div class="dialpad">
+      <div class="dial-key" onclick="pressKey('1')">1</div>
+      <div class="dial-key" onclick="pressKey('2')">2</div>
+      <div class="dial-key" onclick="pressKey('3')">3</div>
+      <div class="dial-key" onclick="pressKey('4')">4</div>
+      <div class="dial-key" onclick="pressKey('5')">5</div>
+      <div class="dial-key" onclick="pressKey('6')">6</div>
+      <div class="dial-key" onclick="pressKey('7')">7</div>
+      <div class="dial-key" onclick="pressKey('8')">8</div>
+      <div class="dial-key" onclick="pressKey('9')">9</div>
+      <div class="dial-key" onclick="pressKey('*')">*</div>
+      <div class="dial-key" onclick="pressKey('0')">0</div>
+      <div class="dial-key" onclick="pressKey('#')">#</div>
+    </div>
+    <button class="call-btn" onclick="startCall()">📹 Iniciar Videollamada</button>
+    <div class="status-text"><span class="status-dot"></span> <span id="peer-status">Conectando...</span></div>
+  </div>
+
+  <div id="incoming-screen" class="screen" style="align-items:center; justify-content:center; background:linear-gradient(to bottom, #1a0d2e, #0a0a0f);">
+    <div style="font-size:12px; text-transform:uppercase; letter-spacing:2px; margin-bottom:10px;">Llamada de</div>
+    <div id="incoming-number-label" style="font-size:32px; font-weight:700; margin-bottom:40px;">---</div>
+    <div style="display:flex; gap:40px;">
+      <div onclick="declineCall()" style="background:#ff1744; width:64px; height:64px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px;">📵</div>
+      <div onclick="acceptCall()" style="background:#00e676; width:64px; height:64px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px;">📹</div>
     </div>
   </div>
-</div>
 
-<!-- ══════════════ CALL SCREEN ══════════════ -->
-<div id="call-screen" class="screen">
-  <!-- Remote video feed (real camera from other player's phone) -->
-  <video id="remote-video" autoplay playsinline></video>
-  <!-- GTA game render canvas (remote game cam via PeerJS stream) -->
-  <canvas id="game-canvas"></canvas>
-
-  <!-- No-video placeholder -->
-  <div class="no-video-placeholder" id="no-video-placeholder">
-    <div class="icon">📡</div>
-    <p>Esperando video...</p>
-  </div>
-
-  <div class="call-overlay">
-    <div class="call-top">
-      <div class="call-name" id="call-remote-name">---</div>
-      <div class="call-timer" id="call-timer">00:00</div>
-    </div>
-
-    <!-- Local PiP (picture-in-picture) -->
-    <div id="local-pip">
-      <video id="local-video-pip" autoplay muted playsinline></video>
-    </div>
-
-    <div class="call-bottom">
-      <!-- Camera mode selector -->
-      <div class="cam-mode-bar">
-        <div class="cam-mode-btn active" id="mode-game" onclick="setCameraMode('game')">🎮 Cámara GTA</div>
-        <div class="cam-mode-btn" id="mode-real" onclick="setCameraMode('real')">📷 Cámara Real</div>
+  <div id="call-screen" class="screen">
+    <video id="remote-video" autoplay playsinline></video>
+    <div class="no-video-placeholder" id="no-video-placeholder">📡 <p>Esperando video...</p></div>
+    <div class="call-overlay">
+      <div class="call-top">
+        <div class="call-name" id="call-remote-name">---</div>
+        <div class="call-timer" id="call-timer">00:00</div>
       </div>
-
-      <div class="call-controls">
-        <div class="ctrl-btn" id="mute-btn" onclick="toggleMute()">
-          <div class="circle">🎙️</div>
-          <div class="label">Silencio</div>
+      <div id="local-pip"><video id="local-video-pip" autoplay muted playsinline></video></div>
+      <div class="call-bottom">
+        <div class="call-controls">
+          <div class="ctrl-btn" id="mute-btn" onclick="toggleMute()"><div class="circle">🎙️</div><div class="label">Silencio</div></div>
+          <div class="ctrl-btn" onclick="flipCamera()"><div class="circle">🔄</div><div class="label">Voltear</div></div>
+          <div class="ctrl-btn" id="speaker-btn" onclick="toggleSpeaker()"><div class="circle">🔊</div><div class="label">Altavoz</div></div>
         </div>
-        <div class="ctrl-btn" id="flip-btn" onclick="flipCamera()">
-          <div class="circle">🔄</div>
-          <div class="label">Voltear</div>
-        </div>
-        <div class="ctrl-btn" id="speaker-btn" onclick="toggleSpeaker()">
-          <div class="circle">🔊</div>
-          <div class="label">Altavoz</div>
-        </div>
+        <button class="hangup-btn" onclick="hangUp()">📵 Colgar</button>
       </div>
-
-      <button class="hangup-btn" onclick="hangUp()">
-        📵 Colgar
-      </button>
     </div>
   </div>
-</div>
 
-<script>
-// ═══════════════════════════════════════════════
-// STATE
-// ═══════════════════════════════════════════════
-let peer = null;
-let localStream = null;
-let currentCall = null;
-let myNumber = null;
-let callTimerInterval = null;
-let callSeconds = 0;
-let isMuted = false;
-let isSelfie = false;
-let cameraMode = 'game'; // 'game' | 'real'
-let gameRender = null;
-let incomingCallRef = null;
+  <script>
+    let peer = null, localStream = null, currentCall = null, myNumber = null, callTimerInterval = null, callSeconds = 0, isMuted = false, isSelfie = false, cameraMode = 'game', gameRender = null, incomingCallRef = null;
 
-// ═══════════════════════════════════════════════
-// SCREEN MANAGEMENT
-// ═══════════════════════════════════════════════
-function showScreen(id) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-}
+    function isFiveM() { return window.location.hostname === 'cfx-nui'; }
+    function fetchNui(event, data) {
+      const resName = (typeof globalThis !== 'undefined' && globalThis.resourceName) ? globalThis.resourceName : 'lb-realcall';
+      return fetch(`https://${resName}/${event}`, { method: 'POST', body: JSON.stringify(data || {}) }).then(r => r.json()).catch(() => ({}));
+    }
 
-// ═══════════════════════════════════════════════
-// INIT — receives data from Lua when app opens
-// ═══════════════════════════════════════════════
-window.addEventListener('message', (e) => {
-  const data = e.data;
-  if (!data || !data.action) return;
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
 
-  switch(data.action) {
-    case 'init':
-      myNumber = data.myNumber;
-      document.getElementById('my-number-label').textContent = myNumber;
-      initPeer(myNumber);
-      break;
+    async function init() {
+      const res = await fetchNui('getMyNumber', {});
+      myNumber = res.number;
+      if (myNumber) {
+        document.getElementById('my-number-label').textContent = myNumber;
+        initPeer(myNumber);
+      } else { setTimeout(init, 1500); }
+    }
 
-    case 'callStarted':
-      // lb-phone initiated a call — open our call screen too
-      showCallScreen(data.number, data.name);
-      break;
-
-    case 'callEnded':
-      cleanupCall();
-      break;
-  }
-});
-
-// ═══════════════════════════════════════════════
-// PEERJS — WebRTC signaling
-// ═══════════════════════════════════════════════
-function initPeer(number) {
-  if (peer) { peer.destroy(); peer = null; }
-
-  // Use the same number as lb-phone so cross-calling works
-  peer = new Peer('lbvc_' + number, {
-    host: '0.peerjs.com',
-    port: 443,
-    secure: true
-  });
-
-  peer.on('open', (id) => {
-    setStatus('Listo · ' + number);
-  });
-
-  peer.on('error', (err) => {
-    setStatus('Error: ' + err.type);
-  });
-
-  // Someone is calling us
-  peer.on('call', (call) => {
-    incomingCallRef = call;
-    const callerNum = call.peer.replace('lbvc_', '');
-    document.getElementById('incoming-number-label').textContent = callerNum;
-    showScreen('incoming-screen');
-  });
-}
-
-function setStatus(msg) {
-  document.getElementById('peer-status').textContent = msg;
-}
-
-// ═══════════════════════════════════════════════
-// DIAL PAD
-// ═══════════════════════════════════════════════
-let inputNumber = '';
-function pressKey(k) {
-  if (inputNumber.length >= 15) return;
-  inputNumber += k;
-  document.getElementById('number-input-display').textContent = inputNumber;
-}
-function backspace() {
-  inputNumber = inputNumber.slice(0, -1);
-  document.getElementById('number-input-display').textContent = inputNumber;
-}
-
-// ═══════════════════════════════════════════════
-// OUTGOING CALL
-// ═══════════════════════════════════════════════
-async function startCall() {
-  const target = inputNumber.trim();
-  if (!target) {
-    alert('Ingresa un número');
-    return;
-  }
-
-  // Tell lb-phone to ring the other player
-  fetchNui('initiateCall', { targetNumber: target });
-
-  await prepareLocalStream();
-  const call = peer.call('lbvc_' + target, localStream);
-  currentCall = call;
-
-  call.on('stream', (remoteStream) => {
-    document.getElementById('remote-video').srcObject = remoteStream;
-    document.getElementById('no-video-placeholder').style.display = 'none';
-  });
-
-  call.on('close', () => cleanupCall());
-  call.on('error', () => cleanupCall());
-
-  showCallScreen(target, target);
-}
-
-// ═══════════════════════════════════════════════
-// INCOMING CALL
-// ═══════════════════════════════════════════════
-async function acceptCall() {
-  if (!incomingCallRef) return;
-  await prepareLocalStream();
-  incomingCallRef.answer(localStream);
-
-  incomingCallRef.on('stream', (remoteStream) => {
-    document.getElementById('remote-video').srcObject = remoteStream;
-    document.getElementById('no-video-placeholder').style.display = 'none';
-  });
-
-  incomingCallRef.on('close', () => cleanupCall());
-
-  currentCall = incomingCallRef;
-  incomingCallRef = null;
-
-  const callerNum = document.getElementById('incoming-number-label').textContent;
-  showCallScreen(callerNum, callerNum);
-}
-
-function declineCall() {
-  if (incomingCallRef) {
-    incomingCallRef.close();
-    incomingCallRef = null;
-  }
-  showScreen('home-screen');
-}
-
-// ═══════════════════════════════════════════════
-// CAMERA SETUP
-// ═══════════════════════════════════════════════
-async function prepareLocalStream() {
-  if (cameraMode === 'game') {
-    await startGameCamera();
-  } else {
-    await startRealCamera();
-  }
-}
-
-async function startGameCamera() {
-  // Tell Lua to enable the GTA walkable cam
-  await fetchNui('startGameCamera', { selfie: isSelfie });
-
-  const canvas = document.getElementById('game-canvas');
-  canvas.style.display = 'block';
-
-  // Use the lb-phone createGameRender component
-  if (globalThis.components && globalThis.components.createGameRender) {
-    gameRender = globalThis.components.createGameRender(canvas);
-    gameRender.resizeByAspect(9 / 16);
-  }
-
-  // Capture canvas as a MediaStream for PeerJS
-  let stream = null;
-  if (canvas.captureStream) {
-    stream = canvas.captureStream(30);
-  } else if (canvas.mozCaptureStream) {
-    stream = canvas.mozCaptureStream(30);
-  }
-
-  // Try to add microphone audio
-  try {
-    const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-    audioStream.getAudioTracks().forEach(t => stream && stream.addTrack(t));
-  } catch(e) { /* no mic available */ }
-
-  localStream = stream;
-
-  // Show local pip with canvas
-  const pipVideo = document.getElementById('local-video-pip');
-  if (stream) pipVideo.srcObject = stream;
-}
-
-async function startRealCamera() {
-  try {
-    localStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: isSelfie ? 'user' : 'environment' },
-      audio: true
+    window.addEventListener('message', (e) => {
+      if (e.data.action === 'callStarted') showCallScreen(e.data.number, e.data.name || e.data.number);
+      if (e.data.action === 'callEnded') cleanupCall();
     });
-    const pipVideo = document.getElementById('local-video-pip');
-    pipVideo.srcObject = localStream;
-  } catch(e) {
-    // Fall back to game camera
-    setCameraMode('game');
-  }
-}
 
-// ═══════════════════════════════════════════════
-// CALL SCREEN UI
-// ═══════════════════════════════════════════════
-function showCallScreen(number, name) {
-  document.getElementById('call-remote-name').textContent = name || number;
-  showScreen('call-screen');
-  startCallTimer();
-}
+    function initPeer(number) {
+      peer = new Peer('lbvc_' + number, { host: '0.peerjs.com', port: 443, secure: true });
+      peer.on('open', () => document.getElementById('peer-status').textContent = 'Listo · ' + number);
+      peer.on('call', (call) => {
+        incomingCallRef = call;
+        document.getElementById('incoming-number-label').textContent = call.peer.replace('lbvc_', '');
+        showScreen('incoming-screen');
+      });
+    }
 
-function startCallTimer() {
-  callSeconds = 0;
-  clearInterval(callTimerInterval);
-  callTimerInterval = setInterval(() => {
-    callSeconds++;
-    const m = String(Math.floor(callSeconds / 60)).padStart(2, '0');
-    const s = String(callSeconds % 60).padStart(2, '0');
-    document.getElementById('call-timer').textContent = m + ':' + s;
-  }, 1000);
-}
+    let inputNumber = '';
+    function pressKey(k) { if (inputNumber.length < 15) inputNumber += k; document.getElementById('number-input-display').textContent = inputNumber; }
+    function backspace() { inputNumber = inputNumber.slice(0, -1); document.getElementById('number-input-display').textContent = inputNumber; }
 
-// ═══════════════════════════════════════════════
-// CALL CONTROLS
-// ═══════════════════════════════════════════════
-function setCameraMode(mode) {
-  cameraMode = mode;
-  document.getElementById('mode-game').classList.toggle('active', mode === 'game');
-  document.getElementById('mode-real').classList.toggle('active', mode === 'real');
+    async function startCall() {
+      const target = inputNumber.trim();
+      if (!target || !peer) return;
+      showCallScreen(target, target);
+      fetchNui('initiateCall', { targetNumber: target });
+      await prepareLocalStream();
+      currentCall = peer.call('lbvc_' + target, localStream || new MediaStream());
+      setupRemoteStreamHandlers(currentCall);
+    }
 
-  // If already in call, switch camera
-  if (currentCall) {
-    prepareLocalStream().then(() => {
-      if (currentCall && localStream) {
-        const sender = currentCall.peerConnection?.getSenders()?.find(s => s.track?.kind === 'video');
-        const videoTrack = localStream.getVideoTracks()[0];
-        if (sender && videoTrack) sender.replaceTrack(videoTrack);
+    async function acceptCall() {
+      if (!incomingCallRef) return;
+      const num = document.getElementById('incoming-number-label').textContent;
+      showCallScreen(num, num);
+      await prepareLocalStream();
+      incomingCallRef.answer(localStream || new MediaStream());
+      setupRemoteStreamHandlers(incomingCallRef);
+      currentCall = incomingCallRef;
+    }
+
+    async function prepareLocalStream() {
+      cameraMode = isFiveM() ? 'game' : 'real';
+      if (cameraMode === 'game') await startGameCamera(); else await startRealCamera();
+    }
+
+    async function startGameCamera() {
+      await fetchNui('startGameCamera', { selfie: isSelfie });
+      const canvas = document.createElement('canvas');
+      canvas.width = 360; canvas.height = 640;
+      const ctx = canvas.getContext('2d');
+      if (globalThis.components?.createGameRender) {
+        const gc = document.createElement('canvas');
+        gameRender = globalThis.components.createGameRender(gc);
+        let active = true;
+        window._stopGameFrameLoop = () => active = false;
+        async function loop() {
+          while(active && gameRender) {
+            const b = await gameRender.takePhoto();
+            if (b && active) { const img = await createImageBitmap(b); ctx.drawImage(img, 0,0,360,640); img.close(); }
+            await new Promise(r => setTimeout(r, 50));
+          }
+        }
+        loop();
       }
-    });
-  }
-}
+      localStream = canvas.captureStream ? canvas.captureStream(20) : new MediaStream();
+      try { const a = await navigator.mediaDevices.getUserMedia({ audio: true }); a.getTracks().forEach(t => localStream.addTrack(t)); } catch(e) {}
+      document.getElementById('local-video-pip').srcObject = localStream;
+    }
 
-function toggleMute() {
-  isMuted = !isMuted;
-  if (localStream) {
-    localStream.getAudioTracks().forEach(t => t.enabled = !isMuted);
-  }
-  document.getElementById('mute-btn').classList.toggle('active', isMuted);
-  document.querySelector('#mute-btn .circle').textContent = isMuted ? '🔇' : '🎙️';
-}
+    async function startRealCamera() {
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: isSelfie ? 'user' : 'environment' }, audio: true });
+        document.getElementById('local-video-pip').srcObject = localStream;
+      } catch(e) { await startGameCamera(); }
+    }
 
-function flipCamera() {
-  isSelfie = !isSelfie;
-  if (cameraMode === 'game') {
-    fetchNui('toggleSelfieCamera', { selfie: isSelfie });
-  } else {
-    startRealCamera();
-  }
-}
+    function setupRemoteStreamHandlers(call) {
+      call.on('stream', s => attachRemoteStream(s));
+      if (call.peerConnection) call.peerConnection.ontrack = e => e.streams[0] && attachRemoteStream(e.streams[0]);
+    }
 
-function toggleSpeaker() {
-  const remoteVideo = document.getElementById('remote-video');
-  remoteVideo.muted = !remoteVideo.muted;
-  document.getElementById('speaker-btn').classList.toggle('active', !remoteVideo.muted);
-}
+    function attachRemoteStream(s) {
+      const v = document.getElementById('remote-video');
+      if (v.srcObject !== s) v.srcObject = s;
+      v.play();
+      document.getElementById('no-video-placeholder').style.display = 'none';
+    }
 
-function hangUp() {
-  if (currentCall) { currentCall.close(); }
-  fetchNui('endCall', {});
-  cleanupCall();
-}
+    function showCallScreen(num, name) {
+      document.getElementById('call-remote-name').textContent = name || num;
+      showScreen('call-screen');
+      callSeconds = 0; clearInterval(callTimerInterval);
+      callTimerInterval = setInterval(() => {
+        callSeconds++;
+        const m = String(Math.floor(callSeconds/60)).padStart(2,'0'), s = String(callSeconds%60).padStart(2,'0');
+        document.getElementById('call-timer').textContent = `${m}:${s}`;
+      }, 1000);
+    }
 
-function cleanupCall() {
-  clearInterval(callTimerInterval);
-  callTimerInterval = null;
-  callSeconds = 0;
+    function hangUp() { if (currentCall) currentCall.close(); fetchNui('endCall'); cleanupCall(); }
+    function cleanupCall() {
+      clearInterval(callTimerInterval);
+      if (localStream) localStream.getTracks().forEach(t => t.stop());
+      if (window._stopGameFrameLoop) window._stopGameFrameLoop();
+      if (gameRender) gameRender.destroy();
+      fetchNui('stopGameCamera');
+      document.getElementById('remote-video').srcObject = null;
+      document.getElementById('no-video-placeholder').style.display = 'flex';
+      showScreen('home-screen');
+    }
 
-  if (localStream) {
-    localStream.getTracks().forEach(t => t.stop());
-    localStream = null;
-  }
+    function toggleMute() { isMuted = !isMuted; if (localStream) localStream.getAudioTracks().forEach(t => t.enabled = !isMuted); document.getElementById('mute-btn').classList.toggle('active', isMuted); }
+    function flipCamera() { isSelfie = !isSelfie; prepareLocalStream().then(() => { if (currentCall) { const s = currentCall.peerConnection.getSenders().find(s => s.track.kind === 'video'); if (s) s.replaceTrack(localStream.getVideoTracks()[0]); } }); }
+    function toggleSpeaker() { const v = document.getElementById('remote-video'); v.muted = !v.muted; document.getElementById('speaker-btn').classList.toggle('active', !v.muted); }
 
-  if (gameRender) {
-    gameRender.destroy();
-    gameRender = null;
-  }
-
-  fetchNui('stopGameCamera', {});
-
-  document.getElementById('remote-video').srcObject = null;
-  document.getElementById('local-video-pip').srcObject = null;
-  document.getElementById('no-video-placeholder').style.display = 'flex';
-  document.getElementById('game-canvas').style.display = 'none';
-
-  isMuted = false;
-  inputNumber = '';
-  document.getElementById('number-input-display').textContent = '';
-
-  showScreen('home-screen');
-}
-
-// ═══════════════════════════════════════════════
-// NUI BRIDGE (FiveM)
-// ═══════════════════════════════════════════════
-function fetchNui(event, data) {
-  return fetch('https://' + (window.resourceName || 'lb-videocall') + '/' + event, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data || {})
-  }).then(r => r.json()).catch(() => ({}));
-}
-
-// onNuiEvent is injected by lb-phone globalThis — use window.message fallback above
-// For development outside FiveM, mock the init:
-if (window.location.hostname !== 'cfx-nui') {
-  const mockNumber = new URLSearchParams(window.location.search).get('number') || '555' + Math.floor(Math.random()*1000);
-  setTimeout(() => {
-    window.dispatchEvent(new MessageEvent('message', { data: { action: 'init', myNumber: mockNumber } }));
-  }, 500);
-}
-</script>
+    window.addEventListener('load', () => setTimeout(init, 500));
+  </script>
 </body>
 </html>
