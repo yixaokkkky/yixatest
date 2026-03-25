@@ -187,14 +187,37 @@
       document.getElementById(id).classList.add('active');
     }
 
-    async function init() {
-      const res = await fetchNui('getMyNumber', {});
-      myNumber = res.number;
-      if (myNumber) {
-        document.getElementById('my-number-label').textContent = myNumber;
-        initPeer(myNumber);
-      } else { setTimeout(init, 1500); }
+        async function init() {
+      // 1. Intentar obtener el número desde FiveM
+      if (isFiveM()) {
+        const res = await fetchNui('getMyNumber', {});
+        myNumber = res.number;
+        if (myNumber && myNumber !== "") {
+          document.getElementById('my-number-label').textContent = myNumber;
+          initPeer(myNumber);
+          return; // Éxito en FiveM
+        }
+        // Si estamos en FiveM pero aún no hay número, reintentar
+        setTimeout(init, 1500);
+      } else {
+        // 2. Si estamos en un celular real / navegador externo
+        // lb-phone suele pasar el número en la URL: ?number=12345
+        const urlParams = new URLSearchParams(window.location.search);
+        myNumber = urlParams.get('number');
+
+        if (myNumber) {
+          document.getElementById('my-number-label').textContent = myNumber;
+          initPeer(myNumber);
+        } else {
+          // Fallback para pruebas rápidas si no hay parámetro en la URL
+          document.getElementById('peer-status').textContent = '⚠️ Falta ?number= en la URL';
+          // Opcional: puedes poner un número fijo para pruebas en navegador
+          // myNumber = "12345"; 
+          // initPeer(myNumber);
+        }
+      }
     }
+
 
     window.addEventListener('message', (e) => {
       if (e.data.action === 'callStarted') showCallScreen(e.data.number, e.data.name || e.data.number);
