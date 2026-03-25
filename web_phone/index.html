@@ -42,7 +42,7 @@
 
     .screen.active { display: flex; pointer-events: all; }
 
-    /* ── HOME ── */
+    /* ── HOME SCREEN ── */
     #home-screen { padding: 24px 20px 32px; background: var(--bg); }
     .app-header { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
     .app-logo {
@@ -116,6 +116,7 @@
 </head>
 <body>
 
+  <!-- ══════════════ HOME SCREEN ══════════════ -->
   <div id="home-screen" class="screen active">
     <div class="app-header">
       <div class="app-logo">📹</div>
@@ -144,15 +145,17 @@
     <div class="status-text"><span class="status-dot"></span> <span id="peer-status">Conectando...</span></div>
   </div>
 
+  <!-- ══════════════ INCOMING SCREEN ══════════════ -->
   <div id="incoming-screen" class="screen" style="align-items:center; justify-content:center; background:linear-gradient(to bottom, #1a0d2e, #0a0a0f);">
     <div style="font-size:12px; text-transform:uppercase; letter-spacing:2px; margin-bottom:10px;">Llamada de</div>
     <div id="incoming-number-label" style="font-size:32px; font-weight:700; margin-bottom:40px;">---</div>
     <div style="display:flex; gap:40px;">
-      <div onclick="declineCall()" style="background:#ff1744; width:64px; height:64px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px;">📵</div>
-      <div onclick="acceptCall()" style="background:#00e676; width:64px; height:64px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px;">📹</div>
+      <div onclick="declineCall()" style="background:#ff1744; width:64px; height:64px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px; cursor:pointer;">📵</div>
+      <div onclick="acceptCall()" style="background:#00e676; width:64px; height:64px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px; cursor:pointer;">📹</div>
     </div>
   </div>
 
+  <!-- ══════════════ CALL SCREEN ══════════════ -->
   <div id="call-screen" class="screen">
     <video id="remote-video" autoplay playsinline></video>
     <div class="no-video-placeholder" id="no-video-placeholder">📡 <p>Esperando video...</p></div>
@@ -174,12 +177,26 @@
   </div>
 
   <script>
-    let peer = null, localStream = null, currentCall = null, myNumber = null, callTimerInterval = null, callSeconds = 0, isMuted = false, isSelfie = false, cameraMode = 'game', gameRender = null, incomingCallRef = null;
+    // ═══════════════════════════════════════════════
+    // VARIABLES GLOBALES
+    // ═══════════════════════════════════════════════
+    let peer = null;
+    let localStream = null;
+    let currentCall = null;
+    let myNumber = null;
+    let callTimerInterval = null;
+    let callSeconds = 0;
+    let isMuted = false;
+    let isSelfie = true; // Empezar con cámara frontal por defecto
+    let cameraMode = 'real';
+    let gameRender = null;
+    let incomingCallRef = null;
 
     function isFiveM() { return window.location.hostname === 'cfx-nui'; }
+
     function fetchNui(event, data) {
       const resName = (typeof globalThis !== 'undefined' && globalThis.resourceName) ? globalThis.resourceName : 'lb-realcall';
-      return fetch(`https://${resName}/${event}`, { method: 'POST', body: JSON.stringify(data || {}) }).then(r => r.json()).catch(() => ({}));
+      return fetch('https://' + resName + '/' + event, { method: 'POST', body: JSON.stringify(data || {}) }).then(r => r.json()).catch(() => ({}));
     }
 
     function showScreen(id) {
@@ -187,166 +204,328 @@
       document.getElementById(id).classList.add('active');
     }
 
-        async function init() {
+    // ═══════════════════════════════════════════════
+    // INIT - Número aleatorio automático
+    // ═══════════════════════════════════════════════
+    async function init() {
       let numberToUse = null;
 
-      // 1. Si estamos en el juego (FiveM), intentamos sacar el oficial
+      // 1. Si estamos en FiveM, pedir el número al juego
       if (isFiveM()) {
         try {
           const res = await fetchNui('getMyNumber', {});
-          if (res.number && res.number !== "") {
-            numberToUse = res.number;
-          }
-        } catch (e) {
-          console.warn("No se pudo obtener el número de FiveM, usando aleatorio.");
-        }
+          if (res.number && res.number !== "") { numberToUse = res.number; }
+        } catch (e) { }
       }
 
-      // 2. Si NO estamos en FiveM o el juego no nos dio número aún
+      // 2. Si no hay número oficial, buscar en la URL o generar aleatorio
       if (!numberToUse) {
-        // Buscamos en la URL (?number=123)
         const urlParams = new URLSearchParams(window.location.search);
         let urlNum = urlParams.get('number');
-
         if (urlNum) {
           numberToUse = urlNum;
         } else {
-          // 3. SI NO HAY NADA: Generamos uno aleatorio único para esta sesión
-          // Usamos sessionStorage para que si refrescas la página no te cambie el número
+          // Generar aleatorio persistente por sesión
           let stored = sessionStorage.getItem('my_random_id');
           if (stored) {
             numberToUse = stored;
           } else {
-            // Generar 6 dígitos aleatorios
             numberToUse = Math.floor(100000 + Math.random() * 900000).toString();
             sessionStorage.setItem('my_random_id', numberToUse);
           }
         }
       }
 
-      // Guardar y arrancar
       myNumber = numberToUse;
       document.getElementById('my-number-label').textContent = myNumber;
       document.getElementById('peer-status').textContent = 'Conectando...';
-      
       initPeer(myNumber);
     }
 
-
+    // ═══════════════════════════════════════════════
+    // EVENTOS DE LUA (solo funcionan dentro de FiveM)
+    // ═══════════════════════════════════════════════
     window.addEventListener('message', (e) => {
       if (e.data.action === 'callStarted') showCallScreen(e.data.number, e.data.name || e.data.number);
       if (e.data.action === 'callEnded') cleanupCall();
     });
 
+    // ═══════════════════════════════════════════════
+    // PEERJS
+    // ═══════════════════════════════════════════════
     function initPeer(number) {
+      if (peer) { try { peer.destroy(); } catch(e){} }
       peer = new Peer('lbvc_' + number, { host: '0.peerjs.com', port: 443, secure: true });
-      peer.on('open', () => document.getElementById('peer-status').textContent = 'Listo · ' + number);
+
+      peer.on('open', () => {
+        document.getElementById('peer-status').textContent = 'Listo · ' + number;
+      });
+
       peer.on('call', (call) => {
         incomingCallRef = call;
         document.getElementById('incoming-number-label').textContent = call.peer.replace('lbvc_', '');
         showScreen('incoming-screen');
       });
+
+      peer.on('error', (err) => {
+        document.getElementById('peer-status').textContent = 'Error: ' + err.type;
+        if (err.type === 'network' || err.type === 'server-error') {
+          setTimeout(() => initPeer(number), 3000);
+        }
+      });
+
+      peer.on('disconnected', () => {
+        document.getElementById('peer-status').textContent = 'Reconectando...';
+        try { peer.reconnect(); } catch(e) { setTimeout(() => initPeer(number), 3000); }
+      });
     }
 
+    // ═══════════════════════════════════════════════
+    // DIAL PAD
+    // ═══════════════════════════════════════════════
     let inputNumber = '';
     function pressKey(k) { if (inputNumber.length < 15) inputNumber += k; document.getElementById('number-input-display').textContent = inputNumber; }
     function backspace() { inputNumber = inputNumber.slice(0, -1); document.getElementById('number-input-display').textContent = inputNumber; }
 
+    // ═══════════════════════════════════════════════
+    // LLAMADA SALIENTE
+    // ═══════════════════════════════════════════════
     async function startCall() {
       const target = inputNumber.trim();
       if (!target || !peer) return;
+
       showCallScreen(target, target);
       fetchNui('initiateCall', { targetNumber: target });
       await prepareLocalStream();
+
       currentCall = peer.call('lbvc_' + target, localStream || new MediaStream());
       setupRemoteStreamHandlers(currentCall);
     }
 
+    // ═══════════════════════════════════════════════
+    // LLAMADA ENTRANTE
+    // ═══════════════════════════════════════════════
     async function acceptCall() {
       if (!incomingCallRef) return;
       const num = document.getElementById('incoming-number-label').textContent;
       showCallScreen(num, num);
+
       await prepareLocalStream();
       incomingCallRef.answer(localStream || new MediaStream());
       setupRemoteStreamHandlers(incomingCallRef);
       currentCall = incomingCallRef;
+      incomingCallRef = null;
     }
 
+    function declineCall() {
+      if (incomingCallRef) { try { incomingCallRef.close(); } catch(e){} incomingCallRef = null; }
+      showScreen('home-screen');
+    }
+
+    // ═══════════════════════════════════════════════
+    // CÁMARA
+    // ═══════════════════════════════════════════════
     async function prepareLocalStream() {
-      cameraMode = isFiveM() ? 'game' : 'real';
-      if (cameraMode === 'game') await startGameCamera(); else await startRealCamera();
+      if (isFiveM()) {
+        cameraMode = 'game';
+        await startGameCamera();
+      } else {
+        cameraMode = 'real';
+        await startRealCamera();
+      }
     }
 
     async function startGameCamera() {
+      isSelfie = true;
       await fetchNui('startGameCamera', { selfie: isSelfie });
+
       const canvas = document.createElement('canvas');
       canvas.width = 360; canvas.height = 640;
       const ctx = canvas.getContext('2d');
-      if (globalThis.components?.createGameRender) {
-        const gc = document.createElement('canvas');
-        gameRender = globalThis.components.createGameRender(gc);
-        let active = true;
-        window._stopGameFrameLoop = () => active = false;
-        async function loop() {
-          while(active && gameRender) {
-            const b = await gameRender.takePhoto();
-            if (b && active) { const img = await createImageBitmap(b); ctx.drawImage(img, 0,0,360,640); img.close(); }
-            await new Promise(r => setTimeout(r, 50));
+
+      if (globalThis.components && typeof globalThis.components.createGameRender === 'function') {
+        try {
+          const gc = document.createElement('canvas');
+          gc.width = 360; gc.height = 640;
+          gameRender = globalThis.components.createGameRender(gc);
+          gameRender.resizeByAspect(9 / 16);
+
+          let active = true;
+          window._stopGameFrameLoop = () => active = false;
+          async function loop() {
+            while(active && gameRender && !gameRender._destroyed) {
+              try {
+                const b = await gameRender.takePhoto();
+                if (b && active) {
+                  const img = await createImageBitmap(b);
+                  ctx.clearRect(0, 0, 360, 640);
+                  ctx.drawImage(img, 0, 0, 360, 640);
+                  img.close();
+                }
+              } catch(e) {}
+              await new Promise(r => setTimeout(r, 60));
+            }
           }
-        }
-        loop();
+          loop();
+        } catch(e) { gameRender = null; }
       }
-      localStream = canvas.captureStream ? canvas.captureStream(20) : new MediaStream();
-      try { const a = await navigator.mediaDevices.getUserMedia({ audio: true }); a.getTracks().forEach(t => localStream.addTrack(t)); } catch(e) {}
-      document.getElementById('local-video-pip').srcObject = localStream;
+
+      localStream = canvas.captureStream ? canvas.captureStream(18) : new MediaStream();
+      try {
+        const a = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        a.getTracks().forEach(t => localStream.addTrack(t));
+      } catch(e) {}
+
+      const pip = document.getElementById('local-video-pip');
+      if (pip) pip.srcObject = localStream;
     }
 
     async function startRealCamera() {
       try {
-        localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: isSelfie ? 'user' : 'environment' }, audio: true });
-        document.getElementById('local-video-pip').srcObject = localStream;
-      } catch(e) { await startGameCamera(); }
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: isSelfie ? 'user' : 'environment' },
+          audio: true
+        });
+        localStream = stream;
+        const pip = document.getElementById('local-video-pip');
+        if (pip) pip.srcObject = stream;
+      } catch(e) {
+        console.warn('No se pudo acceder a la cámara:', e);
+        // Solo intentar game camera si estamos en FiveM
+        if (isFiveM()) {
+          cameraMode = 'game';
+          await startGameCamera();
+        }
+      }
     }
 
+    // ═══════════════════════════════════════════════
+    // STREAM REMOTO + SINCRONIZACIÓN DE COLGADO
+    // ═══════════════════════════════════════════════
     function setupRemoteStreamHandlers(call) {
-      call.on('stream', s => attachRemoteStream(s));
-      if (call.peerConnection) call.peerConnection.ontrack = e => e.streams[0] && attachRemoteStream(e.streams[0]);
+      // Recibir video/audio del otro lado
+      call.on('stream', (s) => attachRemoteStream(s));
+
+      // COLGADO SINCRONIZADO: si el otro cierra, nosotros también
+      call.on('close', () => {
+        console.log('[reaCall] La otra persona colgó');
+        cleanupCall();
+      });
+
+      call.on('error', () => cleanupCall());
+
+      // Fallback directo en peerConnection
+      if (call.peerConnection) {
+        call.peerConnection.ontrack = (e) => {
+          if (e.streams && e.streams[0]) attachRemoteStream(e.streams[0]);
+        };
+
+        // Detectar desconexión ICE
+        call.peerConnection.oniceconnectionstatechange = () => {
+          const state = call.peerConnection.iceConnectionState;
+          if (state === 'disconnected' || state === 'closed' || state === 'failed') {
+            console.log('[reaCall] ICE desconectado:', state);
+            cleanupCall();
+          }
+        };
+      }
     }
 
     function attachRemoteStream(s) {
       const v = document.getElementById('remote-video');
+      if (!v) return;
       if (v.srcObject !== s) v.srcObject = s;
-      v.play();
+
+      v.onloadedmetadata = () => v.play().catch(() => {});
+      v.play().catch(() => {});
+
+      // Reintentos por si el navegador necesita un momento
+      setTimeout(() => { if (v.paused && v.srcObject) v.play().catch(() => {}); }, 500);
+      setTimeout(() => { if (v.paused && v.srcObject) v.play().catch(() => {}); }, 1500);
+
       document.getElementById('no-video-placeholder').style.display = 'none';
     }
 
+    // ═══════════════════════════════════════════════
+    // PANTALLA DE LLAMADA
+    // ═══════════════════════════════════════════════
     function showCallScreen(num, name) {
       document.getElementById('call-remote-name').textContent = name || num;
       showScreen('call-screen');
-      callSeconds = 0; clearInterval(callTimerInterval);
+      callSeconds = 0;
+      clearInterval(callTimerInterval);
       callTimerInterval = setInterval(() => {
         callSeconds++;
-        const m = String(Math.floor(callSeconds/60)).padStart(2,'0'), s = String(callSeconds%60).padStart(2,'0');
-        document.getElementById('call-timer').textContent = `${m}:${s}`;
+        const m = String(Math.floor(callSeconds / 60)).padStart(2, '0');
+        const s = String(callSeconds % 60).padStart(2, '0');
+        document.getElementById('call-timer').textContent = m + ':' + s;
       }, 1000);
     }
 
-    function hangUp() { if (currentCall) currentCall.close(); fetchNui('endCall'); cleanupCall(); }
+    // ═══════════════════════════════════════════════
+    // CONTROLES
+    // ═══════════════════════════════════════════════
+    function hangUp() {
+      if (currentCall) { try { currentCall.close(); } catch(e){} }
+      fetchNui('endCall', {});
+      cleanupCall();
+    }
+
     function cleanupCall() {
       clearInterval(callTimerInterval);
-      if (localStream) localStream.getTracks().forEach(t => t.stop());
-      if (window._stopGameFrameLoop) window._stopGameFrameLoop();
-      if (gameRender) gameRender.destroy();
-      fetchNui('stopGameCamera');
-      document.getElementById('remote-video').srcObject = null;
-      document.getElementById('no-video-placeholder').style.display = 'flex';
+      callTimerInterval = null;
+      callSeconds = 0;
+
+      if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+      if (window._stopGameFrameLoop) { window._stopGameFrameLoop(); window._stopGameFrameLoop = null; }
+      if (gameRender) { try { gameRender.destroy(); } catch(e){} gameRender = null; }
+      fetchNui('stopGameCamera', {});
+
+      const rv = document.getElementById('remote-video');
+      const lp = document.getElementById('local-video-pip');
+      const ph = document.getElementById('no-video-placeholder');
+      if (rv) rv.srcObject = null;
+      if (lp) lp.srcObject = null;
+      if (ph) ph.style.display = 'flex';
+
+      currentCall = null;
+      isMuted = false;
+      inputNumber = '';
+      document.getElementById('number-input-display').textContent = '';
       showScreen('home-screen');
     }
 
-    function toggleMute() { isMuted = !isMuted; if (localStream) localStream.getAudioTracks().forEach(t => t.enabled = !isMuted); document.getElementById('mute-btn').classList.toggle('active', isMuted); }
-    function flipCamera() { isSelfie = !isSelfie; prepareLocalStream().then(() => { if (currentCall) { const s = currentCall.peerConnection.getSenders().find(s => s.track.kind === 'video'); if (s) s.replaceTrack(localStream.getVideoTracks()[0]); } }); }
-    function toggleSpeaker() { const v = document.getElementById('remote-video'); v.muted = !v.muted; document.getElementById('speaker-btn').classList.toggle('active', !v.muted); }
+    function toggleMute() {
+      isMuted = !isMuted;
+      if (localStream) localStream.getAudioTracks().forEach(t => t.enabled = !isMuted);
+      document.getElementById('mute-btn').classList.toggle('active', isMuted);
+      document.querySelector('#mute-btn .circle').textContent = isMuted ? '🔇' : '🎙️';
+    }
 
+    function flipCamera() {
+      isSelfie = !isSelfie;
+      if (localStream) localStream.getVideoTracks().forEach(t => t.stop());
+
+      startRealCamera().then(() => {
+        if (currentCall && localStream) {
+          try {
+            const sender = currentCall.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+            const newTrack = localStream.getVideoTracks()[0];
+            if (sender && newTrack) sender.replaceTrack(newTrack);
+          } catch(e) { console.warn('Error al voltear cámara:', e); }
+        }
+      });
+    }
+
+    function toggleSpeaker() {
+      const v = document.getElementById('remote-video');
+      v.muted = !v.muted;
+      document.getElementById('speaker-btn').classList.toggle('active', !v.muted);
+    }
+
+    // ═══════════════════════════════════════════════
+    // ARRANQUE
+    // ═══════════════════════════════════════════════
     window.addEventListener('load', () => setTimeout(init, 500));
   </script>
 </body>
