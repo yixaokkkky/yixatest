@@ -187,36 +187,37 @@
       document.getElementById(id).classList.add('active');
     }
 
-        async function init() {
-      // 1. Intentar obtener el número desde FiveM
+            async function init() {
+      // 1. Intentar obtener el número oficial desde FiveM (opcional)
+      let officialNumber = null;
       if (isFiveM()) {
         const res = await fetchNui('getMyNumber', {});
-        myNumber = res.number;
-        if (myNumber && myNumber !== "") {
-          document.getElementById('my-number-label').textContent = myNumber;
-          initPeer(myNumber);
-          return; // Éxito en FiveM
-        }
-        // Si estamos en FiveM pero aún no hay número, reintentar
-        setTimeout(init, 1500);
-      } else {
-        // 2. Si estamos en un celular real / navegador externo
-        // lb-phone suele pasar el número en la URL: ?number=12345
-        const urlParams = new URLSearchParams(window.location.search);
-        myNumber = urlParams.get('number');
+        officialNumber = res.number;
+      }
 
-        if (myNumber) {
-          document.getElementById('my-number-label').textContent = myNumber;
-          initPeer(myNumber);
+      // 2. Si hay número oficial y no es vacío, lo usamos
+      if (officialNumber && officialNumber !== "") {
+        myNumber = officialNumber;
+      } else {
+        // 3. SI NO HAY NÚMERO (o estás en el celular real sin ?number=)
+        // Generamos uno aleatorio único basado en el tiempo + un random
+        // Esto hace que sea CASI IMPOSIBLE que dos personas tengan el mismo al mismo tiempo
+        const randomPart = Math.floor(Math.random() * 900000) + 100000; // 6 dígitos
+        myNumber = randomPart.toString();
+        
+        // Si quieres que sea aún más único, puedes guardar este número en el "SessionStorage"
+        // para que si refrescas la página no te cambie el número en la misma sesión
+        if (sessionStorage.getItem('my_random_number')) {
+          myNumber = sessionStorage.getItem('my_random_number');
         } else {
-          // Fallback para pruebas rápidas si no hay parámetro en la URL
-          document.getElementById('peer-status').textContent = '⚠️ Falta ?number= en la URL';
-          // Opcional: puedes poner un número fijo para pruebas en navegador
-          // myNumber = "12345"; 
-          // initPeer(myNumber);
+          sessionStorage.setItem('my_random_number', myNumber);
         }
       }
+
+      document.getElementById('my-number-label').textContent = myNumber;
+      initPeer(myNumber);
     }
+
 
 
     window.addEventListener('message', (e) => {
