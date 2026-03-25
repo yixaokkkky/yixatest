@@ -187,32 +187,51 @@
       document.getElementById(id).classList.add('active');
     }
 
-            async function init() {
-      // 1. Intentar obtener el número oficial desde FiveM (opcional)
-      let officialNumber = null;
-      if (isFiveM()) {
-        const res = await fetchNui('getMyNumber', {});
-        officialNumber = res.number;
-      }
+    async function init() {
+      let numberToUse = null;
 
-      // 2. Si hay número oficial y no es vacío, lo usamos
-      if (officialNumber && officialNumber !== "") {
-        myNumber = officialNumber;
-      } else {
-        // 3. SI NO HAY NÚMERO (o estás en el celular real sin ?number=)
-        // Generamos uno aleatorio único basado en el tiempo + un random
-        // Esto hace que sea CASI IMPOSIBLE que dos personas tengan el mismo al mismo tiempo
-        const randomPart = Math.floor(Math.random() * 900000) + 100000; // 6 dígitos
-        myNumber = randomPart.toString();
-        
-        // Si quieres que sea aún más único, puedes guardar este número en el "SessionStorage"
-        // para que si refrescas la página no te cambie el número en la misma sesión
-        if (sessionStorage.getItem('my_random_number')) {
-          myNumber = sessionStorage.getItem('my_random_number');
-        } else {
-          sessionStorage.setItem('my_random_number', myNumber);
+      // 1. Si estamos en el juego (FiveM), intentamos sacar el oficial
+      if (isFiveM()) {
+        try {
+          const res = await fetchNui('getMyNumber', {});
+          if (res.number && res.number !== "") {
+            numberToUse = res.number;
+          }
+        } catch (e) {
+          console.warn("No se pudo obtener el número de FiveM, usando aleatorio.");
         }
       }
+
+      // 2. Si NO estamos en FiveM o el juego no nos dio número aún
+      if (!numberToUse) {
+        // Buscamos en la URL (?number=123)
+        const urlParams = new URLSearchParams(window.location.search);
+        let urlNum = urlParams.get('number');
+
+        if (urlNum) {
+          numberToUse = urlNum;
+        } else {
+          // 3. SI NO HAY NADA: Generamos uno aleatorio único para esta sesión
+          // Usamos sessionStorage para que si refrescas la página no te cambie el número
+          let stored = sessionStorage.getItem('my_random_id');
+          if (stored) {
+            numberToUse = stored;
+          } else {
+            // Generar 6 dígitos aleatorios
+            numberToUse = Math.floor(100000 + Math.random() * 900000).toString();
+            sessionStorage.setItem('my_random_id', numberToUse);
+          }
+        }
+      }
+
+      // Guardar y arrancar
+      myNumber = numberToUse;
+      document.getElementById('my-number-label').textContent = myNumber;
+      document.getElementById('peer-status').textContent = 'Conectando...';
+      
+      initPeer(myNumber);
+    }
+
 
       document.getElementById('my-number-label').textContent = myNumber;
       initPeer(myNumber);
